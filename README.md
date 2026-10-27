@@ -1,33 +1,41 @@
-# Pocket Shooter
+# Pocket TPS
 
-Godot 4.6.3 / GDScript で作った、簡単な2Dシューティングゲームです。
+Godot 4.6.3 / GDScript で作った、横持ちの簡単な3D TPS（サードパーソン・シューティング）試作です。
+ボット8体を全て倒せば勝ち。ブラウザでそのまま遊べます。
 
 ## 遊ぶ
 
-ブラウザでそのまま遊べます: https://kaito0109.github.io/poket-shooter/
+https://kaito0109.github.io/poket-shooter/
 
-（GitHub Actions が main への push のたびに Godot で Web 版をビルドして GitHub Pages に公開します）
+## 操作
 
-## 遊び方
+- 移動: WASD / 矢印キー / 左スティック（タッチ）
+- 視点: マウス（クリックでキャプチャ）/ 右ドラッグ / 画面右側をドラッグ（タッチ）
+- 射撃: 左クリック長押し / FIREボタン（タッチ）
+- ジャンプ: Space / JUMPボタン、リロード: R / RELOADボタン、ダッシュ: Shift
 
-- 移動: WASD / 矢印キー / 画面ドラッグ（マウス・タッチ）
-- ショット: 自動
-- 敵を2発で撃破すると +100 点。敵にぶつかるとライフ -1（ライフ3つでゲームオーバー）
-- ゲームオーバー後は「もう一度プレイ」ボタンで再開
+## 実装メモ
+
+- プレイヤーと敵ボットは CharacterBody3D + コード生成のマップ（建物・木・箱）
+- 敵AIは「接近→距離を保ってバースト射撃」のシンプルなステアリング方式
+- 射撃はカメラ中心のレイキャスト（ヒットスキャン）、トレーサーとヒットスパーク付き
+- スマホ向けタッチUI（左スティック、FIRE/JUMP/RELOADボタン、右側ドラッグで視点）はタッチ端末で自動表示
+
+## モデルとライセンス
+
+- プレイヤー／敵モデル: **CesiumMan**（KhronosGroup glTF Sample Models、CC-BY 4.0）
+  https://github.com/KhronosGroup/glTF-Sample-Models/tree/main/2.0/CesiumMan
+  敵は同じモデルを赤く着色して使用しています（歩行アニメーションがループ再生しやすい形式だったため）。
+- モデルの GLB はこのリポジトリには含めていません。GitHub Actions がビルド時に上記リポジトリから
+  `assets/player.glb` をダウンロードしてから Godot で書き出します（ワークフローの
+  "Download free character model" ステップ）。手元で開発する場合は同じ場所に GLB を置いてください。
 
 ## ファイル構成
 
-- `project.godot` - プロジェクト設定（720x960、GL Compatibility）
-- `main.tscn` / `main.gd` - メインシーン（敵の出現、スコア、ライフ、HUD）
-- `player.gd` - 自機（移動・自動発射・無敵時間）
-- `bullet.gd` - 弾
-- `enemy.gd` - 敵（2ヒットで撃破、ゆらゆら下降）
-- `explosion.gd` - 撃破エフェクト
-- `starfield.gd` - 背景の星空
-
-すべての図形はコード（`_draw()`）で描いているので、画像素材は不要です。
-
-## Web エクスポート
-
-`export_presets.cfg` に Web プリセット（スレッドサポート OFF）が入っています。
-Godot エディタでこのプロジェクトを開き、プロジェクト → エクスポート → Web で書き出せます。
+- `main.gd` - マップ生成、スポーン、勝敗管理、エフェクト
+- `player.gd` - TPS操作、カメラ、射撃
+- `enemy.gd` - 敵ボットのAI
+- `hud.gd` / `joystick.gd` - HUDとタッチ操作
+- `model_util.gd` - GLBモデルの取り付け・アニメーション制御
+- `tracer.gd` - トレーサー／ヒットスパーク
+- `.github/workflows/web-deploy.yml` - main への push で Web 版を自動ビルドして GitHub Pages に公開
