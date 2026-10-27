@@ -7,7 +7,7 @@ const MAX_HP: int = 100
 const SPEED: float = 3.4
 const GRAVITY: float = 24.0
 const STOP_DISTANCE: float = 15.0
-const SIGHT_RANGE: float = 45.0
+const SIGHT_RANGE: float = 30.0
 const MODEL_FACING_OFFSET: float = PI
 
 var hp: int = MAX_HP
@@ -20,6 +20,7 @@ var anim_player: AnimationPlayer
 var tint_material: StandardMaterial3D
 var base_tint := Color(1.35, 0.5, 0.5)
 
+var head_marker: MeshInstance3D
 var burst_left: int = 0
 var burst_timer: float = 0.0
 var think_timer: float = 0.0
@@ -47,6 +48,22 @@ func _ready() -> void:
 		model_root.rotation.y = MODEL_FACING_OFFSET
 	if mesh_instance != null:
 		tint_material = mesh_instance.material_override as StandardMaterial3D
+	# Overhead marker so bots stay visible at range.
+	head_marker = MeshInstance3D.new()
+	var marker_mesh := SphereMesh.new()
+	marker_mesh.radius = 0.09
+	marker_mesh.height = 0.18
+	marker_mesh.radial_segments = 10
+	marker_mesh.rings = 6
+	head_marker.mesh = marker_mesh
+	var marker_mat := StandardMaterial3D.new()
+	marker_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	marker_mat.albedo_color = Color(1.0, 0.2, 0.15)
+	head_marker.material_override = marker_mat
+	head_marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	head_marker.position = Vector3(0, 2.05, 0)
+	add_child(head_marker)
+	burst_timer = randf_range(0.8, 1.6)
 	think_timer = randf() * 0.5
 	if randf() < 0.5:
 		strafe_dir = -1.0
@@ -119,7 +136,7 @@ func _physics_process(delta: float) -> void:
 				burst_timer = 0.17
 				burst_left -= 1
 				_bot_shoot(player, dist)
-		elif burst_timer <= -randf_range(0.7, 1.4):
+		elif burst_timer <= -randf_range(1.2, 2.2):
 			burst_left = 4
 			burst_timer = 0.0
 
@@ -137,12 +154,12 @@ func _bot_shoot(player: Node3D, dist: float) -> void:
 	var main = get_parent()
 	var muzzle_pos: Vector3 = global_position + Vector3(0, 1.4, 0) + (player.global_position - global_position).normalized() * 0.5
 	var target_pos: Vector3 = player.global_position + Vector3(0, 1.1, 0)
-	var hit_chance: float = clampf(1.05 - dist / 34.0, 0.2, 0.8)
+	var hit_chance: float = clampf(0.95 - dist / 30.0, 0.15, 0.62)
 	var is_hit: bool = randf() < hit_chance
 	var end_point: Vector3 = target_pos
 	if is_hit:
 		if player.has_method("take_damage"):
-			player.call("take_damage", 6, self)
+			player.call("take_damage", 5, self)
 	else:
 		end_point = target_pos + Vector3(randf_range(-1.6, 1.6), randf_range(-0.5, 1.2), randf_range(-1.6, 1.6))
 	if main != null and main.has_method("spawn_tracer"):
@@ -161,6 +178,8 @@ func take_damage(amount: int, _from: Node3D) -> void:
 
 func _die() -> void:
 	dead = true
+	if head_marker != null:
+		head_marker.visible = false
 	collision_layer = 0
 	collision_mask = 0
 	var main = get_parent()

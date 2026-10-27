@@ -26,6 +26,8 @@ var jump_button: Button
 var reload_button: Button
 var touch_shown: bool = false
 
+var hit_markers: Array = []
+var hit_marker_index: int = 0
 var look_touch_active: bool = false
 var look_start_was_button: bool = false
 
@@ -60,6 +62,17 @@ func _build_widgets() -> void:
 		bar.color = ch_color
 		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_child(bar)
+
+	# Directional hit indicators (pooled markers around the crosshair).
+	for i in 6:
+		var marker := ColorRect.new()
+		marker.size = Vector2(34, 12)
+		marker.pivot_offset = marker.size * 0.5
+		marker.color = Color(1.0, 0.2, 0.15, 0.9)
+		marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		marker.visible = false
+		root.add_child(marker)
+		hit_markers.append(marker)
 
 	# Top-left: HP.
 	hp_label = _make_label(root, Vector2(18, 12), 24, "HP 100")
@@ -285,3 +298,31 @@ func show_center_message(text: String) -> void:
 	center_label.modulate.a = 1.0
 	tween.tween_interval(1.6)
 	tween.tween_property(center_label, "modulate:a", 0.0, 0.6)
+
+func show_hit_direction(attacker_pos: Vector3, player_pos: Vector3, yaw: float) -> void:
+	if hit_markers.is_empty():
+		return
+	var dir3: Vector3 = attacker_pos - player_pos
+	dir3.y = 0.0
+	if dir3.length() < 0.5:
+		return
+	dir3 = dir3.normalized()
+	var dir2 := Vector2(dir3.x, dir3.z)
+	var forward := Vector2(-sin(yaw), -cos(yaw))
+	var right := Vector2(cos(yaw), -sin(yaw))
+	var ang: float = atan2(dir2.dot(right), dir2.dot(forward))
+	var center: Vector2 = get_viewport().get_visible_rect().size * 0.5
+	var marker: ColorRect = hit_markers[hit_marker_index]
+	hit_marker_index = (hit_marker_index + 1) % hit_markers.size()
+	marker.position = center + Vector2(sin(ang), -cos(ang)) * 120.0 - marker.size * 0.5
+	marker.rotation = ang
+	marker.modulate.a = 1.0
+	marker.visible = true
+	if marker.has_meta("tween"):
+		var old: Tween = marker.get_meta("tween")
+		if old != null and old.is_valid():
+			old.kill()
+	var tween: Tween = create_tween()
+	marker.set_meta("tween", tween)
+	tween.tween_property(marker, "modulate:a", 0.0, 0.8)
+	tween.tween_callback(func() -> void: marker.visible = false)

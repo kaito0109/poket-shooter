@@ -234,9 +234,11 @@ func on_bot_killed(_bot: Node) -> void:
 	else:
 		hud.show_center_message("キル！ 残り %d 体" % bots_alive)
 
-func on_player_damaged(hp: int, max_hp: int) -> void:
+func on_player_damaged(hp: int, max_hp: int, attacker: Node3D = null) -> void:
 	hud.set_hp(hp, max_hp)
 	hud.flash_damage()
+	if attacker != null and is_instance_valid(attacker):
+		hud.show_hit_direction(attacker.global_position, player.global_position, float(player.get("yaw")))
 
 func on_ammo_changed(ammo: int, max_ammo: int, reloading: bool) -> void:
 	hud.set_ammo(ammo, max_ammo, reloading)

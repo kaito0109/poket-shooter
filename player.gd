@@ -219,7 +219,7 @@ func take_damage(amount: int, _from: Node3D) -> void:
 	hp -= amount
 	var main = get_parent()
 	if main != null and main.has_method("on_player_damaged"):
-		main.on_player_damaged(hp, MAX_HP)
+		main.on_player_damaged(hp, MAX_HP, _from)
 	if hp <= 0:
 		hp = 0
 		dead = true
