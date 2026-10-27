@@ -11,8 +11,13 @@ const SIGHT_RANGE: float = 30.0
 const MODEL_FACING_OFFSET: float = PI
 
 var hp: int = MAX_HP
+var max_hp: int = MAX_HP
 var dead: bool = false
 var active: bool = false
+var bot_name: String = "BOT"
+var accuracy: float = 1.0
+var last_hit_by_player: bool = false
+var zone_tick: float = 0.0
 
 var model_root: Node3D
 var mesh_instance: MeshInstance3D
@@ -66,8 +71,16 @@ func _ready() -> void:
 	add_child(head_marker)
 	burst_timer = randf_range(0.8, 1.6)
 	think_timer = randf() * 0.5
+	accuracy = randf_range(0.8, 1.25)
 	if randf() < 0.5:
 		strafe_dir = -1.0
+
+func configure(p_name: String, p_hp: int, p_scale: float) -> void:
+	bot_name = p_name
+	max_hp = p_hp
+	hp = p_hp
+	if model_root != null and p_scale != 1.0:
+		model_root.scale *= p_scale
 
 func _physics_process(delta: float) -> void:
 	if dead:
@@ -90,6 +103,17 @@ func _physics_process(delta: float) -> void:
 		ModelUtil.set_locomotion(anim_player, false, 0.0)
 		return
 
+	# Safe-zone pressure: take damage outside, and run for the center.
+	var zone: Node = get_tree().get_first_node_in_group("zone")
+	var outside_zone: bool = false
+	if zone != null and bool(zone.call("is_outside", global_position)):
+		outside_zone = true
+		zone_tick += delta
+		var zdps: int = zone.get("current_dps")
+		if zone_tick >= 1.0 and zdps > 0:
+			zone_tick = 0.0
+			take_damage(zdps, null)
+
 	var to_player: Vector3 = player.global_position - global_position
 	to_player.y = 0.0
 	var dist: float = to_player.length()
@@ -101,7 +125,12 @@ func _physics_process(delta: float) -> void:
 		model_root.rotation.y = target_yaw + MODEL_FACING_OFFSET
 
 	var move_dir := Vector3.ZERO
-	if dist > STOP_DISTANCE:
+	if outside_zone and zone != null:
+		var zc: Vector2 = zone.get("center")
+		var to_center := Vector3(zc.x - global_position.x, 0, zc.y - global_position.z)
+		if to_center.length() > 3.0:
+			move_dir = to_center.normalized()
+	elif dist > STOP_DISTANCE:
 		move_dir = dir_to_player
 	elif dist < STOP_DISTANCE * 0.7:
 		move_dir = -dir_to_player * 0.6
@@ -158,7 +187,7 @@ func _bot_shoot(player: Node3D, dist: float) -> void:
 	var main = get_parent()
 	var muzzle_pos: Vector3 = global_position + Vector3(0, 1.4, 0) + (player.global_position - global_position).normalized() * 0.5
 	var target_pos: Vector3 = player.global_position + Vector3(0, 1.1, 0)
-	var hit_chance: float = clampf(0.95 - dist / 30.0, 0.15, 0.62)
+	var hit_chance: float = clampf((0.95 - dist / 30.0) * accuracy, 0.1, 0.7)
 	var is_hit: bool = randf() < hit_chance
 	var end_point: Vector3 = target_pos
 	if is_hit:
@@ -170,9 +199,10 @@ func _bot_shoot(player: Node3D, dist: float) -> void:
 		main.spawn_tracer(muzzle_pos, end_point, Color(1.0, 0.45, 0.35, 0.9))
 		main.spawn_spark(muzzle_pos, Color(1.0, 0.6, 0.35))
 
-func take_damage(amount: int, _from: Node3D) -> void:
+func take_damage(amount: int, from_node: Node3D = null) -> void:
 	if dead:
 		return
+	last_hit_by_player = from_node != null and from_node.is_in_group("player")
 	hp -= amount
 	if tint_material != null:
 		tint_material.albedo_color = Color(3.0, 3.0, 3.0)
