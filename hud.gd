@@ -95,33 +95,42 @@ func _build_widgets() -> void:
 	root.add_child(hp_bar)
 
 	# Top-right: kills / remaining.
-	stat_label = _make_label(root, Vector2(-320, 12), 24, "")
-	stat_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	stat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	stat_label = _make_label(root, Vector2.ZERO, 24, "")
 	stat_label.size = Vector2(300, 34)
+	stat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 	# Bottom-right: ammo.
-	ammo_label = _make_label(root, Vector2(-240, -52), 26, "")
-	ammo_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	ammo_label = _make_label(root, Vector2.ZERO, 26, "")
 	ammo_label.size = Vector2(220, 36)
+	ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 	# Center message.
-	center_label = _make_label(root, Vector2(-400, -120), 40, "")
-	center_label.set_anchors_preset(Control.PRESET_CENTER)
-	center_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	center_label = _make_label(root, Vector2.ZERO, 40, "")
 	center_label.size = Vector2(800, 60)
+	center_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	center_label.modulate.a = 0.0
 
 	# Bottom-center hint.
-	hint_label = _make_label(root, Vector2(-400, -40), 18, "")
-	hint_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint_label = _make_label(root, Vector2.ZERO, 18, "")
 	hint_label.size = Vector2(800, 30)
+	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
 
 	_build_panel(root)
 	_build_touch_controls(root)
+	_layout_labels()
+	get_viewport().size_changed.connect(_layout_labels)
+
+func _layout_labels() -> void:
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	if stat_label != null:
+		stat_label.position = Vector2(vp.x - 316.0, 12.0)
+	if ammo_label != null:
+		ammo_label.position = Vector2(vp.x - 236.0, vp.y - 54.0)
+	if center_label != null:
+		center_label.position = Vector2(vp.x * 0.5 - 400.0, vp.y * 0.5 - 170.0)
+	if hint_label != null:
+		hint_label.position = Vector2(vp.x * 0.5 - 400.0, vp.y - 44.0)
 
 func _make_label(parent: Control, pos: Vector2, font_size: int, text: String) -> Label:
 	var label := Label.new()

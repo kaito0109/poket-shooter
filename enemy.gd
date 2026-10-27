@@ -21,6 +21,7 @@ var tint_material: StandardMaterial3D
 var base_tint := Color(1.35, 0.5, 0.5)
 
 var head_marker: MeshInstance3D
+var grace_timer: float = 3.0
 var burst_left: int = 0
 var burst_timer: float = 0.0
 var think_timer: float = 0.0
@@ -129,8 +130,11 @@ func _physics_process(delta: float) -> void:
 	ModelUtil.set_locomotion(anim_player, Vector2(velocity.x, velocity.z).length() > 0.4, 0.55)
 
 	# Shooting: burst fire with distance-based accuracy when in sight.
+	# No firing during the first seconds so the player can get oriented.
+	if grace_timer > 0.0:
+		grace_timer -= delta
 	burst_timer -= delta
-	if dist < SIGHT_RANGE and _has_line_of_sight(player):
+	if grace_timer <= 0.0 and dist < SIGHT_RANGE and _has_line_of_sight(player):
 		if burst_left > 0:
 			if burst_timer <= 0.0:
 				burst_timer = 0.17
