@@ -2,6 +2,12 @@
 
 Godot 4.6.3 / GDScript で作った、簡単な2Dシューティングゲームです。
 
+## 遊ぶ
+
+ブラウザでそのまま遊べます: https://kaito0109.github.io/poket-shooter/
+
+（GitHub Actions が main への push のたびに Godot で Web 版をビルドして GitHub Pages に公開します）
+
 ## 遊び方
 
 - 移動: WASD / 矢印キー / 画面ドラッグ（マウス・タッチ）
