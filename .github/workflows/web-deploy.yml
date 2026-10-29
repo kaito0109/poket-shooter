@@ -45,6 +45,7 @@ jobs:
           mkdir -p assets
           wget -q -O assets/player.glb "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/CesiumMan/glTF-Binary/CesiumMan.glb"
           ls -lh assets/
+          curl -L -o assets/jpfont.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/mplus1p/MPLUS1p-Regular.ttf"
 
       - name: Import project
         run: godot --headless --path . --import --quit
