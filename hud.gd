@@ -51,6 +51,7 @@ var hitmarker_alpha: float = 0.0
 var hit_dir_alpha: float = 0.0
 var hit_dir_angle: float = 0.0
 var look_dragging: bool = false
+var look_pointer_id: int = -2  # -2 none, -1 mouse, >=0 touch index
 var touch_mode: bool = false
 
 class HitDir:
@@ -84,6 +85,11 @@ func _build() -> void:
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if main != null and main.get("game_font") != null:
+		var th := Theme.new()
+		th.default_font = main.get("game_font")
+		th.default_font_size = 16
+		root.theme = th
 	add_child(root)
 	# Damage vignette.
 	damage_overlay = ColorRect.new()
@@ -109,6 +115,8 @@ func _build() -> void:
 	root.add_child(items_label)
 	# Compass + zone.
 	compass = CompassScript.new()
+	if main != null and main.get("game_font") != null:
+		compass.set("font_to_use", main.get("game_font"))
 	root.add_child(compass)
 	zone_label = _mk_label("", 16, Color(0.85, 0.9, 1.0))
 	zone_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -204,6 +212,7 @@ func _build_touch(root: Control) -> void:
 	_add_touch_button("CROUCH", "しゃがみ")
 	_add_touch_button("FPP", "視点")
 	_add_touch_button("MAP", "マップ")
+	_add_touch_button("GRENADE", "榴弾")
 	_add_touch_button("EJECT", "降下！")
 	_add_touch_button("SWAP", "持ち替え")
 	touch_buttons["FIRE"].button_down.connect(func() -> void: player.set("touch_firing", true))
@@ -219,6 +228,7 @@ func _build_touch(root: Control) -> void:
 	touch_buttons["CROUCH"].toggled.connect(func(_on: bool) -> void: player.call("toggle_crouch"))
 	touch_buttons["FPP"].pressed.connect(func() -> void: player.call("toggle_first_person"))
 	touch_buttons["MAP"].pressed.connect(func() -> void: _toggle_big_map())
+	touch_buttons["GRENADE"].pressed.connect(func() -> void: player.call("throw_grenade"))
 	touch_buttons["EJECT"].pressed.connect(func() -> void:
 		if main != null:
 			main.call("player_eject_requested"))
@@ -319,6 +329,7 @@ func _layout() -> void:
 		"WEAPON": [vp.x - 330, vp.y - 128, 78, 62],
 		"HEAL": [vp.x - 330, vp.y - 206, 78, 62],
 		"DRINK": [vp.x - 330, vp.y - 284, 78, 62],
+		"GRENADE": [vp.x - 330, vp.y - 362, 78, 62],
 		"CROUCH": [vp.x - 238, vp.y - 330, 84, 62],
 		"FPP": [16, 120, 70, 52],
 		"MAP": [16, 182, 70, 52],
@@ -407,9 +418,9 @@ func refresh() -> void:
 	var helmet: int = int(player.get("helmet_lv"))
 	var vest: int = int(player.get("vest_lv"))
 	armor_label.text = "ヘルメット %s　ベスト %s" % [("Lv%d" % helmet) if helmet > 0 else "なし", ("Lv%d" % vest) if vest > 0 else "なし"]
-	items_label.text = "包帯×%d 応急×%d 医療×%d ドリンク×%d 鎮痛×%d" % [
+	items_label.text = "包帯×%d 応急×%d 医療×%d ドリンク×%d 鎮痛×%d 榴弾×%d" % [
 		int(player.get("bandages")), int(player.get("firstaids")), int(player.get("medkits")),
-		int(player.get("drinks")), int(player.get("painkillers"))]
+		int(player.get("drinks")), int(player.get("painkillers")), int(player.get("grenades"))]
 	# Weapon panel.
 	var slots: Array = player.get("slots")
 	var mags: Array = player.get("slot_mags")
@@ -505,20 +516,32 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if (event as InputEventKey).keycode == KEY_M:
 			_toggle_big_map()
-	# Touch look: drag on the right half (mouse events emulate touch on web).
-	if event is InputEventMouseButton:
+	# True multitouch: the look drag owns one touch index; the joystick and
+	# buttons own theirs, so stick + camera work at the same time.
+	if event is InputEventScreenTouch:
+		touch_mode = true
+		var st: InputEventScreenTouch = event as InputEventScreenTouch
+		if st.pressed and look_pointer_id == -2 and _is_look_area(st.position):
+			look_pointer_id = st.index
+		elif not st.pressed and st.index == look_pointer_id:
+			look_pointer_id = -2
+	elif event is InputEventScreenDrag:
+		var sd: InputEventScreenDrag = event as InputEventScreenDrag
+		if sd.index == look_pointer_id and player != null and String(player.get("state")) != "plane":
+			player.call("add_look_input", sd.relative)
+	elif event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
-			if mb.pressed and _is_look_area(mb.position):
+			if mb.pressed and look_pointer_id == -2 and _is_look_area(mb.position):
+				look_pointer_id = -1
 				look_dragging = true
-				touch_mode = true
-			elif not mb.pressed:
+			elif not mb.pressed and look_pointer_id == -1:
+				look_pointer_id = -2
 				look_dragging = false
-	elif event is InputEventMouseMotion and look_dragging:
+	elif event is InputEventMouseMotion and look_pointer_id == -1 and look_dragging:
 		var mm: InputEventMouseMotion = event as InputEventMouseMotion
 		if player != null and String(player.get("state")) != "plane":
 			player.call("add_look_input", mm.relative)
-		touch_mode = true
 
 func _is_look_area(pos: Vector2) -> bool:
 	if panel.visible:
@@ -526,7 +549,7 @@ func _is_look_area(pos: Vector2) -> bool:
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	if pos.x < vp.x * 0.42:
 		return false
-	if touch_root.visible:
+	if touch_mode or touch_root.visible:
 		for id: String in touch_buttons.keys():
 			var b: Button = touch_buttons[id] as Button
 			if b.visible and b.get_global_rect().has_point(pos):

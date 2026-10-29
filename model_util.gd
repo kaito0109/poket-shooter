@@ -69,3 +69,67 @@ static func _find_anim_player(node: Node) -> AnimationPlayer:
 		if found != null:
 			return found
 	return null
+
+static func build_gear(model: Node3D) -> Dictionary:
+	## PUBG-style worn gear attached to a character model: helmet dome,
+	## armored vest block and a backpack. Positions are in model space
+	## (feet at origin, character faces -Z, ~1.75m tall).
+	var gear := {}
+	var helmet := MeshInstance3D.new()
+	var dome := SphereMesh.new()
+	dome.radius = 0.155
+	dome.height = 0.28
+	helmet.mesh = dome
+	helmet.scale = Vector3(1.05, 0.75, 1.05)
+	helmet.position = Vector3(0, 1.565, 0)
+	helmet.visible = false
+	model.add_child(helmet)
+	gear["helmet"] = helmet
+	var vest := MeshInstance3D.new()
+	var vest_mesh := BoxMesh.new()
+	vest_mesh.size = Vector3(0.37, 0.46, 0.26)
+	vest.mesh = vest_mesh
+	vest.position = Vector3(0, 1.06, -0.02)
+	vest.visible = false
+	model.add_child(vest)
+	gear["vest"] = vest
+	var pack := MeshInstance3D.new()
+	var pack_mesh := BoxMesh.new()
+	pack_mesh.size = Vector3(0.34, 0.46, 0.19)
+	pack.mesh = pack_mesh
+	pack.position = Vector3(0, 1.1, 0.21)
+	pack.visible = false
+	var pack_mat := StandardMaterial3D.new()
+	pack_mat.albedo_color = Color(0.25, 0.32, 0.2)
+	pack.material_override = pack_mat
+	model.add_child(pack)
+	gear["pack"] = pack
+	return gear
+
+static func set_gear(gear: Dictionary, helmet_lv: int, vest_lv: int, has_pack: bool) -> void:
+	if gear.is_empty():
+		return
+	if int(gear.get("h_lv", -1)) == helmet_lv and int(gear.get("v_lv", -1)) == vest_lv and bool(gear.get("pack_on", false)) == has_pack:
+		return
+	gear["h_lv"] = helmet_lv
+	gear["v_lv"] = vest_lv
+	gear["pack_on"] = has_pack
+	var helmet_cols: Array[Color] = [Color(0.42, 0.47, 0.36), Color(0.3, 0.36, 0.48), Color(0.16, 0.16, 0.18)]
+	var vest_cols: Array[Color] = [Color(0.45, 0.5, 0.38), Color(0.34, 0.4, 0.34), Color(0.2, 0.22, 0.25)]
+	var helmet: MeshInstance3D = gear.get("helmet")
+	var vest: MeshInstance3D = gear.get("vest")
+	var pack: MeshInstance3D = gear.get("pack")
+	if helmet != null:
+		helmet.visible = helmet_lv > 0
+		if helmet_lv > 0:
+			var hm := StandardMaterial3D.new()
+			hm.albedo_color = helmet_cols[helmet_lv - 1]
+			helmet.material_override = hm
+	if vest != null:
+		vest.visible = vest_lv > 0
+		if vest_lv > 0:
+			var vm := StandardMaterial3D.new()
+			vm.albedo_color = vest_cols[vest_lv - 1]
+			vest.material_override = vm
+	if pack != null:
+		pack.visible = has_pack

@@ -10,6 +10,7 @@ const ZoneScript := preload("res://zone.gd")
 const SfxScript := preload("res://sfx.gd")
 const LootScript := preload("res://loot.gd")
 const BulletScript := preload("res://bullet.gd")
+const GrenadeScript := preload("res://grenade.gd")
 
 const BOT_COUNT: int = 24
 const WORLD_HALF: float = 240.0
@@ -26,6 +27,7 @@ const BOT_TINTS: Array[Color] = [
 	Color(0.95, 0.75, 0.6), Color(0.65, 0.6, 0.8), Color(0.85, 0.7, 0.85), Color(0.55, 0.75, 0.75),
 ]
 
+var game_font: Font
 var player: CharacterBody3D
 var hud
 var zone
@@ -54,6 +56,7 @@ var loot_poll_timer: float = 0.0
 
 func _ready() -> void:
 	add_to_group("main")
+	_load_game_font()
 	rng.randomize()
 	noise.seed = 20261029
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
@@ -95,6 +98,14 @@ func _ready() -> void:
 	hud.show_panel("POCKET TPS",
 		"飛行機から降下して、武器を拾って、最後の1人まで生き残れ！\n降下: Fキー（飛行中）　武器: 歩いて拾う / Fで持ち替え\n射撃: クリック　狙う: 右クリック　しゃがみ: C　リーン: Q/E\n回復: 4 包帯 / 5 応急 / 6 医療 / 7 ドリンク　マップ: M\nゾーン（青い壁）の外はダメージ。敵も武器を拾って戦うぞ。",
 		"スタート")
+
+func _load_game_font() -> void:
+	if ResourceLoader.exists("res://assets/jpfont.ttf"):
+		game_font = load("res://assets/jpfont.ttf") as Font
+	if game_font == null:
+		var sf := SystemFont.new()
+		sf.font_names = PackedStringArray(["Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Yu Gothic", "Meiryo", "sans-serif"])
+		game_font = sf
 
 # --- World gen ---
 
@@ -412,6 +423,8 @@ func _loot_in_house(hpos: Vector3) -> void:
 		spawn_loot("ammo_" + kind, Vector3(inner.x + rng.randf_range(-2.5, 2.5), 0, inner.y + rng.randf_range(-2.5, 2.5)), int(Weapons.AMMO_PACKS[kind]))
 		if rng.randf() < 0.6:
 			spawn_loot("ammo_" + kind, Vector3(inner.x + rng.randf_range(-2.5, 2.5), 0, inner.y + rng.randf_range(-2.5, 2.5)), int(Weapons.AMMO_PACKS[kind]))
+	if rng.randf() < 0.3:
+		spawn_loot("grenade", Vector3(inner.x + rng.randf_range(-2, 2), 0, inner.y + rng.randf_range(-2, 2)))
 	# Armor and heals.
 	if rng.randf() < 0.55:
 		spawn_loot(_random_armor(), Vector3(inner.x + rng.randf_range(-2, 2), 0, inner.y + rng.randf_range(-2, 2)))
@@ -699,6 +712,33 @@ func spawn_bullet(shooter: Node3D, from: Vector3, dir: Vector3, weapon_id: Strin
 	var bullet: Node3D = BulletScript.new()
 	add_child(bullet)
 	bullet.call("setup", shooter, weapon_id, from, dir)
+
+func spawn_grenade(thrower: Node3D, from: Vector3, vel: Vector3) -> void:
+	var grenade: Node3D = GrenadeScript.new()
+	add_child(grenade)
+	grenade.call("setup", thrower, from, vel)
+
+func explode(at_pos: Vector3, thrower: Node3D) -> void:
+	var player_dist: float = player.global_position.distance_to(at_pos)
+	sfx.call("play", "boom", clampf(-2.0 - player_dist * 0.1, -24.0, -2.0))
+	spawn_spark(at_pos + Vector3(0, 0.4, 0), Color(1.0, 0.55, 0.15))
+	spawn_spark(at_pos + Vector3(0, 0.9, 0), Color(0.4, 0.4, 0.4))
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	for node: Node in get_tree().get_nodes_in_group("actors"):
+		var actor: Node3D = node as Node3D
+		if actor == null or bool(actor.get("dead")):
+			continue
+		var chest: Vector3 = actor.global_position + Vector3(0, 1.1, 0)
+		var d: float = at_pos.distance_to(chest)
+		if d > 6.0:
+			continue
+		var dmg: float = lerpf(95.0, 18.0, clampf(d / 6.0, 0.0, 1.0))
+		var query := PhysicsRayQueryParameters3D.create(at_pos + Vector3(0, 0.3, 0), chest, 1)
+		if not space.intersect_ray(query).is_empty():
+			dmg *= 0.45
+		actor.call("take_damage", dmg, thrower, chest, false)
+	if player_dist < 13.0 and not bool(player.get("dead")):
+		player.set("kick_offset", float(player.get("kick_offset")) - 0.05 * (1.0 - player_dist / 13.0))
 
 func spawn_tracer(from: Vector3, to: Vector3, color: Color) -> void:
 	var tracer: MeshInstance3D = TracerScript.new()

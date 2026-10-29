@@ -53,6 +53,7 @@ var stuck_time: float = 0.0
 var last_pos: Vector3 = Vector3.ZERO
 var avoid_side: float = 1.0
 var roam_wait: float = 0.0
+var gear: Dictionary = {}
 var time_alive: float = 0.0
 
 func _ready() -> void:
@@ -85,6 +86,8 @@ func configure(p_name: String, tint: Color) -> void:
 	var attached: Dictionary = ModelUtil.attach_character(self, "res://assets/player.glb", randf_range(1.7, 1.8), tint)
 	model_root = attached.get("model")
 	anim_player = attached.get("anim_player")
+	if model_root != null:
+		gear = ModelUtil.build_gear(model_root)
 
 func start_chute(at_pos: Vector3, landing: Vector3) -> void:
 	visible = true
@@ -275,6 +278,7 @@ func _physics_process(delta: float) -> void:
 	if think_timer <= 0.0:
 		think_timer = 0.22
 		_think()
+		ModelUtil.set_gear(gear, helmet_lv, vest_lv, weapon_id != "" or heal_items > 1)
 	if reloading:
 		reload_left -= delta
 		if reload_left <= 0.0:
@@ -531,7 +535,11 @@ func _try_shoot(dist: float) -> void:
 			main.call("spawn_bullet", self, muzzle.global_position, dir, weapon_id)
 	var sfx: Node = get_tree().get_first_node_in_group("sfx")
 	if sfx != null:
-		var vol: float = clampf(-4.0 - dist * 0.12, -26.0, -4.0)
+		var player_node: Node = get_tree().get_first_node_in_group("player")
+		var pd: float = 200.0
+		if player_node != null:
+			pd = global_position.distance_to((player_node as Node3D).global_position)
+		var vol: float = clampf(-2.0 - pd * 0.13, -30.0, -2.0)
 		sfx.call("play", String(data["sfx"]), vol, randf_range(0.94, 1.05))
 	burst_left -= 1
 	if burst_left <= 0:

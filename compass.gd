@@ -1,6 +1,8 @@
 extends Control
 ## PUBG-style compass strip: heading ticks and cardinal directions.
 
+var font_to_use: Font = null
+
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 
@@ -16,7 +18,7 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.28))
 	var cx: float = size.x * 0.5
 	var px_per_deg: float = 3.2
-	var font: Font = ThemeDB.fallback_font
+	var font: Font = font_to_use if font_to_use != null else ThemeDB.fallback_font
 	for deg_i in range(0, 360, 15):
 		var deg: float = float(deg_i)
 		var rel: float = wrapf(deg - heading + 180.0, 0.0, 360.0) - 180.0

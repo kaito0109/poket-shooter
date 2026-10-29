@@ -1,35 +1,53 @@
 extends Control
-## Virtual joystick: drag inside the base circle. Works with mouse events,
-## which on mobile web are emulated from touch by Godot.
+## Virtual joystick with true multitouch: tracks one touch index (or the
+## mouse) so the camera can be dragged with another finger at the same time.
 
 var value: Vector2 = Vector2.ZERO
 var knob_offset: Vector2 = Vector2.ZERO
 var dragging: bool = false
 var radius: float = 85.0
+var _pointer_id: int = -2  # -2 = none, -1 = mouse, >=0 = touch index
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(radius * 2.0, radius * 2.0)
 	size = custom_minimum_size
-	mouse_filter = MOUSE_FILTER_STOP
+	mouse_filter = MOUSE_FILTER_IGNORE
 
-func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event as InputEventScreenTouch
+		if st.pressed and _pointer_id == -2 and get_global_rect().has_point(st.position):
+			_pointer_id = st.index
+			dragging = true
+			_update_knob(st.position)
+		elif not st.pressed and st.index == _pointer_id:
+			_release()
+	elif event is InputEventScreenDrag:
+		var sd: InputEventScreenDrag = event as InputEventScreenDrag
+		if sd.index == _pointer_id:
+			_update_knob(sd.position)
+	elif event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
-			dragging = mb.pressed
-			if dragging:
+			if mb.pressed and _pointer_id == -2 and get_global_rect().has_point(mb.position):
+				_pointer_id = -1
+				dragging = true
 				_update_knob(mb.position)
-			else:
-				value = Vector2.ZERO
-				knob_offset = Vector2.ZERO
-				queue_redraw()
-			accept_event()
-	elif event is InputEventMouseMotion and dragging:
-		var mm: InputEventMouseMotion = event as InputEventMouseMotion
-		_update_knob(mm.position)
-		accept_event()
+			elif not mb.pressed and _pointer_id == -1:
+				_release()
+	elif event is InputEventMouseMotion:
+		if _pointer_id == -1 and dragging:
+			_update_knob((event as InputEventMouseMotion).position)
 
-func _update_knob(local_pos: Vector2) -> void:
+func _release() -> void:
+	_pointer_id = -2
+	dragging = false
+	value = Vector2.ZERO
+	knob_offset = Vector2.ZERO
+	queue_redraw()
+
+func _update_knob(global_pos: Vector2) -> void:
+	var local_pos: Vector2 = get_global_transform().affine_inverse() * global_pos
 	var center: Vector2 = size * 0.5
 	var delta: Vector2 = local_pos - center
 	if delta.length() > radius:

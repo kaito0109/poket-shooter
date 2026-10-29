@@ -12,7 +12,7 @@ const NAMES: Dictionary = {
 	"drink": "エナジードリンク", "painkiller": "鎮痛剤",
 	"helmet1": "ヘルメット Lv1", "helmet2": "ヘルメット Lv2", "helmet3": "ヘルメット Lv3",
 	"vest1": "ベスト Lv1", "vest2": "ベスト Lv2", "vest3": "ベスト Lv3",
-	"crate": "補給箱",
+	"crate": "補給箱", "grenade": "破片手榴弾",
 }
 
 static func display_name_for(type: String, amt: int = 0) -> String:
@@ -119,11 +119,24 @@ func setup(type: String, p_amount: int = 0) -> void:
 		can.position = Vector3(0, 0.28, 0)
 		can.material_override = _mat(Color(0.15, 0.75, 0.9) if type == "drink" else Color(0.95, 0.6, 0.15), 0.25)
 		visual_root.add_child(can)
+	elif type == "grenade":
+		var g := MeshInstance3D.new()
+		var gs := SphereMesh.new()
+		gs.radius = 0.11
+		gs.height = 0.22
+		g.mesh = gs
+		g.position = Vector3(0, 0.26, 0)
+		g.material_override = _mat(Color(0.25, 0.32, 0.18))
+		visual_root.add_child(g)
+		_box(visual_root, Vector3(0.06, 0.08, 0.06), Vector3(0, 0.4, 0), Color(0.6, 0.6, 0.62))
 	else: # crate
 		_box(visual_root, Vector3(0.55, 0.4, 0.55), Vector3(0, 0.32, 0), Color(0.45, 0.38, 0.2))
 		_box(visual_root, Vector3(0.57, 0.08, 0.57), Vector3(0, 0.55, 0), Color(0.35, 0.3, 0.16))
 	# Floating name label.
 	var label := Label3D.new()
+	var main_node: Node = get_tree().get_first_node_in_group("main")
+	if main_node != null and main_node.get("game_font") != null:
+		label.font = main_node.get("game_font")
 	label.text = display_name()
 	label.font_size = 42
 	label.pixel_size = 0.0038

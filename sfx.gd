@@ -20,6 +20,7 @@ func _ready() -> void:
 	streams["shotgun"] = _make_shot(0.95)
 	streams["sniper"] = _make_sniper()
 	streams["chute"] = _make_tone(300.0, 0.25, 0.2, 520.0)
+	streams["boom"] = _make_boom()
 	streams["hit"] = _make_tone(1900.0, 0.045, 0.25, 0.0)
 	streams["hurt"] = _make_tone(240.0, 0.1, 0.3, 0.0)
 	streams["pickup"] = _make_tone(880.0, 0.09, 0.3, 660.0)
@@ -80,6 +81,20 @@ func _make_sniper() -> AudioStreamWAV:
 		var crack: float = rng.randf_range(-1.0, 1.0) * pow(1.0 - t, 3.5) * 0.9
 		var boom: float = sin(TAU * 90.0 * float(i) / MIX_RATE) * pow(1.0 - t, 1.6) * 0.7
 		samples[i] = crack + boom
+	return _to_wav(samples)
+
+func _make_boom() -> AudioStreamWAV:
+	var count: int = int(MIX_RATE * 0.55)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 31337
+	for i in count:
+		var t: float = float(i) / float(count)
+		var env: float = pow(1.0 - t, 1.8)
+		var noise: float = rng.randf_range(-1.0, 1.0) * (1.0 - t * 0.7)
+		var thump: float = sin(TAU * 55.0 * float(i) / MIX_RATE) * 0.9
+		samples[i] = (noise * 0.55 + thump) * env * 0.95
 	return _to_wav(samples)
 
 func _make_tone(freq: float, duration: float, volume: float, slide_to: float) -> AudioStreamWAV:

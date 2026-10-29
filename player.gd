@@ -54,6 +54,14 @@ var lean: float = 0.0
 var fall_time: float = 0.0
 var air_forward: Vector3 = Vector3.ZERO
 var last_attacker: Node3D = null
+var gear: Dictionary = {}
+var model_yaw_offset: float = 0.0
+var sprinting_now: bool = false
+var ads_block_timer: float = 0.0
+var grenades: int = 0
+var throw_cooldown: float = 0.0
+var flash_light: OmniLight3D
+var flash_timer: float = 0.0
 
 # Touch controls (set by HUD)
 var touch_move: Vector2 = Vector2.ZERO
@@ -77,9 +85,11 @@ func _ready() -> void:
 	add_child(shape_node)
 	capsule = shape_node
 
-	var attached: Dictionary = ModelUtil.attach_character(self, "res://assets/player.glb", 1.75, Color.WHITE)
+	var attached: Dictionary = ModelUtil.attach_character(self, "res://assets/player.glb", 1.75, Color(0.8, 0.76, 0.66))
 	model_root = attached.get("model")
 	anim = attached.get("anim_player")
+	if model_root != null:
+		gear = ModelUtil.build_gear(model_root)
 	if model_root != null:
 		model_base_scale = model_root.scale.y
 
@@ -95,6 +105,12 @@ func _ready() -> void:
 	gun_root = Node3D.new()
 	gun_root.position = Vector3(0.34, 1.28, -0.25)
 	add_child(gun_root)
+	flash_light = OmniLight3D.new()
+	flash_light.light_color = Color(1.0, 0.75, 0.4)
+	flash_light.light_energy = 0.0
+	flash_light.omni_range = 6.0
+	flash_light.position = Vector3(0, 0.05, -1.0)
+	gun_root.add_child(flash_light)
 	muzzle = Marker3D.new()
 	gun_root.add_child(muzzle)
 	_build_gun("")
@@ -299,6 +315,7 @@ func apply_loot(item: Node) -> int:
 			return 1
 		return 0
 	match type:
+		"grenade": grenades += 1
 		"bandage": bandages += 1
 		"firstaid": firstaids += 1
 		"medkit": medkits += 1
@@ -370,7 +387,7 @@ func switch_slot(idx: int) -> void:
 
 func _build_gun(weapon_id: String) -> void:
 	for child: Node in gun_root.get_children():
-		if child != muzzle:
+		if child != muzzle and child != flash_light:
 			child.queue_free()
 	gun_root.visible = weapon_id != ""
 	if weapon_id == "":
@@ -463,6 +480,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_6: start_use_item("medkit")
 			KEY_7: start_use_item("drink")
 			KEY_8: start_use_item("painkiller")
+			KEY_G: throw_grenade()
 
 func add_look_input(relative_px: Vector2) -> void:
 	yaw -= relative_px.x * 0.0042
@@ -558,8 +576,16 @@ func _handle_ground(delta: float) -> void:
 				reserve[kind] = int(reserve.get(kind, 0)) - take
 			_sync()
 	# Aim / lean state.
+	ads_block_timer = maxf(ads_block_timer - delta, 0.0)
+	throw_cooldown = maxf(throw_cooldown - delta, 0.0)
+	if flash_timer > 0.0:
+		flash_timer -= delta
+		flash_light.light_energy = 2.4 * clampf(flash_timer / 0.05, 0.0, 1.0)
+	else:
+		flash_light.light_energy = 0.0
+	gun_root.rotation.x = lerpf(gun_root.rotation.x, 0.55 if reloading else 0.0, clampf(delta * 8.0, 0.0, 1.0))
 	var mouse_captured: bool = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
-	aiming = (mouse_captured and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)) or touch_aiming
+	aiming = ((mouse_captured and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)) or touch_aiming) and ads_block_timer <= 0.0
 	var lean_target: float = 0.0
 	if Input.is_key_pressed(KEY_Q):
 		lean_target = -1.0
@@ -569,6 +595,7 @@ func _handle_ground(delta: float) -> void:
 	# Movement.
 	var input_vec: Vector2 = _move_input() if input_enabled else Vector2.ZERO
 	var sprinting: bool = (Input.is_key_pressed(KEY_SHIFT) or touch_move.y < -0.92) and input_vec.y < -0.3 and not aiming and not crouching and heal_kind == ""
+	sprinting_now = sprinting
 	var speed: float = 5.6
 	if sprinting:
 		speed = 7.8
@@ -592,8 +619,17 @@ func _handle_ground(delta: float) -> void:
 			velocity.y = 5.4
 			touch_jump = false
 	move_and_slide()
-	# Model facing + walk animation.
+	# Model facing + walk animation. The body turns toward the movement
+	# direction (PUBG-style); while aiming or just after firing it faces
+	# the camera forward again.
 	var moving: bool = Vector2(velocity.x, velocity.z).length() > 0.4
+	if moving and not aiming and fire_timer <= 0.05:
+		var move_yaw: float = atan2(-velocity.x, -velocity.z)
+		var target_offset: float = wrapf(move_yaw - yaw, -PI, PI)
+		model_yaw_offset = lerp_angle(model_yaw_offset, target_offset, clampf(delta * 9.0, 0.0, 1.0))
+	else:
+		model_yaw_offset = lerp_angle(model_yaw_offset, 0.0, clampf(delta * 11.0, 0.0, 1.0))
+	model_root.rotation.y = model_yaw_offset
 	model_root.rotation.z = -lean * 0.22
 	ModelUtil.set_locomotion(anim, moving, Vector2(velocity.x, velocity.z).length() / 7.8)
 	# RMB-drag fallback look (when pointer is not captured).
@@ -639,11 +675,26 @@ func _handle_shooting(_delta: float, mouse_captured: bool) -> void:
 		dir = dir.rotated(cam_basis.x, randf_range(-ang, ang)).rotated(cam_basis.y, randf_range(-ang, ang)).normalized()
 		if main != null:
 			main.call("spawn_bullet", self, muzzle.global_position, dir, current_weapon_id())
+	if current_weapon_id() == "kar98":
+		ads_block_timer = 0.9
+	flash_timer = 0.05
 	kick_offset -= float(data["kick"]) * 0.014
 	pitch = clampf(pitch + float(data["kick"]) * 0.002, -1.25, 1.35)
 	_play_sfx(String(data["sfx"]), -3.0)
 	if main != null:
 		main.call("spawn_spark", muzzle.global_position, Color(1.0, 0.75, 0.3))
+	_sync()
+
+func throw_grenade() -> void:
+	if dead or state != "ground" or grenades <= 0 or throw_cooldown > 0.0 or heal_kind != "":
+		return
+	grenades -= 1
+	throw_cooldown = 0.8
+	var main: Node = get_tree().get_first_node_in_group("main")
+	if main != null:
+		var dir: Vector3 = -camera.global_transform.basis.z
+		dir = (dir + Vector3.UP * 0.38).normalized()
+		main.call("spawn_grenade", self, camera.global_position + dir * 0.6, dir * 19.0 + velocity * 0.5)
 	_sync()
 
 func _start_reload() -> void:
@@ -662,6 +713,8 @@ func _update_camera(delta: float) -> void:
 	var data: Dictionary = current_data()
 	var target_len: float = 4.4
 	var target_fov: float = 70.0
+	if sprinting_now and not aiming:
+		target_fov = 76.0
 	if first_person:
 		target_len = 0.0
 	elif aiming and not data.is_empty():
@@ -680,6 +733,9 @@ func _play_sfx(sound_name: String, volume_db: float) -> void:
 		sfx.call("play", sound_name, volume_db)
 
 func _sync() -> void:
+	if model_root != null:
+		var has_pack: bool = grenades > 0 or bandages + firstaids + medkits + drinks + painkillers > 0 or current_weapon_id() != ""
+		ModelUtil.set_gear(gear, helmet_lv, vest_lv, has_pack)
 	var main: Node = get_tree().get_first_node_in_group("main")
 	if main != null:
 		main.call("sync_hud")
