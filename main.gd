@@ -532,7 +532,6 @@ func on_panel_button() -> void:
 
 func start_game() -> void:
 	started = true
-	_try_fullscreen_landscape()
 	panel_mode = "restart"
 	hud.hide_panel()
 	plane_z = rng.randf_range(-140.0, 140.0)
@@ -542,8 +541,13 @@ func start_game() -> void:
 	player.global_position = plane.position
 	zone.start_match()
 	hud.show_center_message("飛行機から降下せよ！")
+	# Cosmetic nicety last: if the web bridge call ever misbehaves, the match
+	# is already running.
+	_try_fullscreen_landscape()
 
 func _try_fullscreen_landscape() -> void:
+	if not OS.has_feature("web"):
+		return
 	# Web only: ask the browser for fullscreen + landscape lock (works on
 	# Android Chrome; iOS browsers ignore it, the rotate notice covers them).
 	var js: Object = Engine.get_singleton("JavaScriptBridge")
