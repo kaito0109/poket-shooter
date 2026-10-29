@@ -5,7 +5,7 @@ extends Node3D
 signal phase_changed
 
 # phases: [wait_time, shrink_time, radius_factor_of_previous, dps]
-const PHASES: Array = [
+var PHASES: Array = [
 	[22.0, 18.0, 0.58, 1],
 	[18.0, 15.0, 0.55, 2],
 	[15.0, 12.0, 0.5, 4],
@@ -19,6 +19,7 @@ var state: String = "waiting"  # waiting | shrinking | final
 var time_left: float = 0.0
 
 var center: Vector2 = Vector2.ZERO  # XZ
+var start_radius: float = 96.0
 var radius: float = 96.0
 var from_center: Vector2 = Vector2.ZERO
 var from_radius: float = 96.0
@@ -39,7 +40,7 @@ func _ready() -> void:
 func _build_meshes() -> void:
 	# Vertical translucent wall (open cylinder side surface, radius 1 -> scaled).
 	var segments: int = 72
-	var height: float = 42.0
+	var height: float = 90.0
 	var verts := PackedVector3Array()
 	var indices := PackedInt32Array()
 	for i in segments + 1:
@@ -108,6 +109,16 @@ func _update_meshes() -> void:
 		ring.position = Vector3(center.x, 0.06, center.y)
 		ring.scale = Vector3(radius, 1.0, radius)
 
+func configure(p_start_radius: float, phases: Array, p_center: Vector2) -> void:
+	start_radius = p_start_radius
+	radius = p_start_radius
+	from_radius = p_start_radius
+	target_radius = p_start_radius
+	center = p_center
+	target_center = p_center
+	if not phases.is_empty():
+		PHASES = phases
+
 func start_match() -> void:
 	running = true
 	phase_index = -1
@@ -115,7 +126,7 @@ func start_match() -> void:
 	time_left = PHASES[0][0]
 	current_dps = 0
 	center = Vector2.ZERO
-	radius = 96.0
+	radius = start_radius
 	_pick_next_target()
 
 func _pick_next_target() -> void:

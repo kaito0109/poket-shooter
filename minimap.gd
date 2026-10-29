@@ -1,11 +1,12 @@
 extends Control
 ## PUBG-style minimap: whole arena, zone circles, nearby bots, player arrow.
 
-const WORLD_RADIUS: float = 80.0
+var WORLD_RADIUS: float = 80.0
 
 var buildings: Array = []  # Array of Rect2 in world XZ coords
 
 func _ready() -> void:
+	clip_contents = true
 	custom_minimum_size = Vector2(168, 168)
 	size = custom_minimum_size
 	mouse_filter = MOUSE_FILTER_IGNORE
