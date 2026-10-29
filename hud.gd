@@ -50,6 +50,8 @@ var vignette_alpha: float = 0.0
 var hitmarker_alpha: float = 0.0
 var hit_dir_alpha: float = 0.0
 var hit_dir_angle: float = 0.0
+var rotate_notice: ColorRect
+var rotate_label: Label
 var look_dragging: bool = false
 var look_pointer_id: int = -2  # -2 none, -1 mouse, >=0 touch index
 var touch_mode: bool = false
@@ -188,6 +190,18 @@ func _build() -> void:
 	hit_dir.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hit_dir.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(hit_dir)
+	# Portrait notice: the game is designed for landscape.
+	rotate_notice = ColorRect.new()
+	rotate_notice.color = Color(0, 0, 0, 0.62)
+	rotate_notice.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rotate_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rotate_notice.visible = false
+	root.add_child(rotate_notice)
+	rotate_label = _mk_label("デバイスを横向きにしてください", 26, Color(1, 1, 1))
+	rotate_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rotate_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rotate_label.visible = false
+	root.add_child(rotate_label)
 	_build_touch(root)
 	_build_panel(root)
 	get_viewport().size_changed.connect(_layout)
@@ -319,6 +333,8 @@ func _layout() -> void:
 	panel_text.size = Vector2(512, 190)
 	panel_button.position = Vector2(180, 300)
 	panel_button.size = Vector2(200, 52)
+	rotate_label.position = Vector2(20, vp.y * 0.5 - 24)
+	rotate_label.size = Vector2(vp.x - 40, 48)
 	# Touch UI.
 	joystick.position = Vector2(26, vp.y - 206)
 	var pos_map: Dictionary = {
@@ -352,13 +368,17 @@ func _process(delta: float) -> void:
 	# Per-frame visual updates.
 	if player != null:
 		var pstate: String = String(player.get("state"))
+		var match_started: bool = main != null and bool(main.get("started"))
+		var vsize: Vector2 = get_viewport().get_visible_rect().size
+		rotate_notice.visible = vsize.y > vsize.x
+		rotate_label.visible = vsize.y > vsize.x
 		crosshair.visible = pstate == "ground" and not bool(player.get("dead"))
 		if touch_root.visible:
-			touch_buttons["EJECT"].visible = pstate == "plane"
+			touch_buttons["EJECT"].visible = match_started and pstate == "plane"
 			var near_w: Variant = main.get("near_weapon_loot") if main != null else null
-			touch_buttons["SWAP"].visible = pstate == "ground" and near_w != null
+			touch_buttons["SWAP"].visible = match_started and pstate == "ground" and near_w != null
 		# Flight prompt.
-		match pstate:
+		match pstate if match_started else "":
 			"plane":
 				flight_label.text = "飛行機で移動中… 好きな場所で Fキー / 降下ボタン！"
 			"fall":

@@ -532,6 +532,7 @@ func on_panel_button() -> void:
 
 func start_game() -> void:
 	started = true
+	_try_fullscreen_landscape()
 	panel_mode = "restart"
 	hud.hide_panel()
 	plane_z = rng.randf_range(-140.0, 140.0)
@@ -541,6 +542,13 @@ func start_game() -> void:
 	player.global_position = plane.position
 	zone.start_match()
 	hud.show_center_message("飛行機から降下せよ！")
+
+func _try_fullscreen_landscape() -> void:
+	# Web only: ask the browser for fullscreen + landscape lock (works on
+	# Android Chrome; iOS browsers ignore it, the rotate notice covers them).
+	var js: Object = Engine.get_singleton("JavaScriptBridge")
+	if js != null:
+		js.call("eval", "try{var e=document.documentElement;if(e.requestFullscreen){e.requestFullscreen();}if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landscape').catch(function(){});}}catch(err){}")
 
 func request_mouse_capture() -> void:
 	if not DisplayServer.is_touchscreen_available():
