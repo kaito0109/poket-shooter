@@ -14,6 +14,9 @@ func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 
 func _input(event: InputEvent) -> void:
+	# On touch devices the OS touch path is authoritative; emulated mouse
+	# events (needed so GUI Buttons receive taps) must not drive the stick.
+	var allow_mouse: bool = not DisplayServer.is_touchscreen_available()
 	if event is InputEventScreenTouch:
 		var st: InputEventScreenTouch = event as InputEventScreenTouch
 		if st.pressed and _pointer_id == -2 and get_global_rect().has_point(st.position):
@@ -26,7 +29,7 @@ func _input(event: InputEvent) -> void:
 		var sd: InputEventScreenDrag = event as InputEventScreenDrag
 		if sd.index == _pointer_id:
 			_update_knob(sd.position)
-	elif event is InputEventMouseButton:
+	elif allow_mouse and event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed and _pointer_id == -2 and get_global_rect().has_point(mb.position):
@@ -35,7 +38,7 @@ func _input(event: InputEvent) -> void:
 				_update_knob(mb.position)
 			elif not mb.pressed and _pointer_id == -1:
 				_release()
-	elif event is InputEventMouseMotion:
+	elif allow_mouse and event is InputEventMouseMotion:
 		if _pointer_id == -1 and dragging:
 			_update_knob((event as InputEventMouseMotion).position)
 

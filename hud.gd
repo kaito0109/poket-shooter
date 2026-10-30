@@ -549,7 +549,7 @@ func _input(event: InputEvent) -> void:
 		var sd: InputEventScreenDrag = event as InputEventScreenDrag
 		if sd.index == look_pointer_id and player != null and String(player.get("state")) != "plane":
 			player.call("add_look_input", sd.relative)
-	elif event is InputEventMouseButton:
+	elif not DisplayServer.is_touchscreen_available() and event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed and look_pointer_id == -2 and _is_look_area(mb.position):
@@ -558,7 +558,7 @@ func _input(event: InputEvent) -> void:
 			elif not mb.pressed and look_pointer_id == -1:
 				look_pointer_id = -2
 				look_dragging = false
-	elif event is InputEventMouseMotion and look_pointer_id == -1 and look_dragging:
+	elif not DisplayServer.is_touchscreen_available() and event is InputEventMouseMotion and look_pointer_id == -1 and look_dragging:
 		var mm: InputEventMouseMotion = event as InputEventMouseMotion
 		if player != null and String(player.get("state")) != "plane":
 			player.call("add_look_input", mm.relative)
